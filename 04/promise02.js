@@ -60,4 +60,4 @@ setTimeout(function(){
    p.then(function(response){
      console.log('can i invoke?');
    })
-},0)
+},1000)
