@@ -568,3 +568,76 @@ setTimeout(function(){
 },1000)
 
 ```
+
+### 另一种更优雅的实现
+```
+function Promise(fn){
+  var value = null;
+  var state = 'pending';
+  var deferreds = [];
+
+  this.then = function(onFulfilled){
+    return new Promise(function(resolve){
+      handle({
+        onFulfilled:onFulfilled,
+        resolve: resolve
+      })
+    });  
+  }
+
+  /**
+   * 添加或者使用deferred
+   * @param deferred 
+   */
+  function handle(deferred){
+    if(state === 'pending'){
+      deferreds.push(deferred);
+      return;
+    }
+
+    let res = deferred.onFulfilled(value);
+    deferred.resolve(res);
+  }
+
+  /**
+   * resolve函数
+   * @param newValue 
+   */
+  function resolve(newValue){
+    if(newValue instanceof Promise){
+      newValue.then(resolve)
+      return;
+    }
+    setTimeout(function(){
+      value = newValue;
+      state = 'fulfilled';
+      deferreds.forEach(deferred =>handle(deferred));
+    },0)
+  }
+
+  fn(resolve);
+
+}
+
+
+
+let p1 = new Promise(function(resolve){
+  setTimeout(()=>{resolve('000')},2000);
+})
+
+p1.then(function(v){
+  console.log(v);
+})
+.then(function(v){
+  console.log(v);
+})
+.then(function(v){
+  console.log(v);
+  return new Promise(function(resolve){
+    setTimeout(()=>{resolve('111')},4000)
+  })
+})
+.then(function(v){
+  console.log(v);
+})
+```
