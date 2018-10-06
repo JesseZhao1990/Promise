@@ -641,3 +641,99 @@ p1.then(function(v){
   console.log(v);
 })
 ```
+
+加上reject状态
+```
+function Promise(fn){
+  var value = null;
+  var state = 'pending';
+  var deferreds = [];
+
+  this.then = function(onFulfilled,onRejected){
+    return new Promise(function(resolve){
+      handle({
+        onFulfilled:onFulfilled || null,
+        onRejected:onRejected || null,
+        resolve: resolve,
+        reject:reject
+      })
+    });  
+  }
+
+  /**
+   * 添加或者使用deferred
+   * @param deferred 
+   */
+  function handle(deferred){
+    if(state === 'pending'){
+      deferreds.push(deferred);
+      return;
+    }
+
+    let cb = state === 'fulfilled' ? deferred.onFulfilled : deferred.onRejected;
+
+    if(cb === null){
+      cb = state === 'fulfilled' ? deferred.resolve : deferred.reject;
+      cb(value);
+      return;
+    }
+    
+    let res = cb(value);
+    deferred.resolve(res);
+  }
+
+  /**
+   * resolve函数
+   * @param newValue 
+   */
+  function resolve(newValue){
+    if(newValue instanceof Promise){
+      newValue.then(resolve,reject)
+      return;
+    }
+    value = newValue;
+    state = 'fulfilled';
+    setTimeout(function(){
+      deferreds.forEach(deferred =>handle(deferred));
+    },0)
+  }
+
+
+  function reject(newValue){
+    value = newValue;
+    state = 'rejected';
+    setTimeout(function(){
+      deferreds.forEach(deferred =>handle(deferred));
+    })
+  }
+
+  fn(resolve,reject);
+
+}
+
+
+
+let p1 = new Promise(function(resolve,reject){
+  setTimeout(()=>{reject('000')},2000);
+})
+
+p1.then(function(v){
+  console.log(v);
+},function(error){
+  console.log(error);
+})
+.then(function(v){
+  console.log(v);
+})
+.then(function(v){
+  console.log(v);
+  return new Promise(function(resolve,reject){
+    setTimeout(()=>{reject('111')},4000)
+  })
+})
+.then(function(v){
+  console.log(v);
+},function(error){
+  console.log(error);
+})
+```
