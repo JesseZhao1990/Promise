@@ -1,46 +1,45 @@
 /**
- * 先看一下前一个例子存在的问题
- * 1.在前一个例子中不断调用then需要支持链式调用，每次执行then都要返回调用对象本身。
- * 2.在前一个例子中，当链式调用的时候，每次then中的值都是同一个值，这是有问题的。其实第一次then中的返回值，应该是第二次调用then中的函数的参数，依次类推。
- * 所以，我们进一步优化一下代码。
- * 
+ * 延时机制
+ * 如果promise是同步代码，resolve会先于then执行，这时deferreds队列还是空的，还有一个问题是, 后续的注册的回调函数再也不会被执行了
+ * 可以在控制台里观察一下这种现象
  */
-function Promise(fn){
+
+var p1 = new MyPromise(function(resolve){
+  resolve('响应的数据')
+})
+
+p1.then(function(response){
+  console.log(response);   // 这一行永远不会被打印出来，想一下为什么？
+})
+
+
+// 加入延时机制，来重新定义MyPromise (我们用setTimeout来模拟，setTimeout是macroTask，真正的promise的延时是一个microTask)
+
+function MyPromise(fn){
   var value= null;
-  var callbacks = [];
+  var deferreds = [];
   this.then = function(onFulfilled) {
-    callbacks.push({f:onFulfilled});
-    return this;
+    deferreds.push(onFulfilled);
   }
 
   function resolve(value){
-    callbacks.map(function(cb,index){
-      if(index === 0){
-        callbacks[index].value = value;
-      }
-      var rsp = cb.f(cb.value);
-      if(typeof callbacks[index+1] !== 'undefined'){
-        callbacks[index+1].value = rsp;
-      }
-    })
+    setTimeout(function(){
+      deferreds.forEach(function(deferred){
+        deferred(value);
+      })
+    },0)
   }
+
   fn(resolve);
 }
 
-
-// 使用Promise
-var p = new Promise(function(resolve){
-  setTimeout(function(){
-    resolve('这是响应的数据')
-  },2000)
+// 此时，我们再次使用一下我们定义的MyPromise，来执行一下同步代码
+var p1 = new MyPromise(function(resolve){
+  resolve('响应的数据')
 })
 
-p.then(function(response){
-  console.log(response);
-  return 1;
-}).then(function(response){
-  console.log(response);
-  return 2;  
-}).then(function(response){
-  console.log(response);
+p1.then(function(response){
+  console.log(response);   // 竟然打印出来了
 })
+
+// 到此，我们设计出了延时机制的promise

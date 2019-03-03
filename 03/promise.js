@@ -1,50 +1,64 @@
 /**
- * 先看一下前一个例子存在的问题
- * 1. 如果在then方法注册回调之前，resolve函数就执行了，怎么办？比如 new Promise的时候传入的函数是同步函数的话，
- * then还没被注册，resolve就执行了。。这在PromiseA+规范中是不允许的，规范明确要求回调需要通过异步的方式执行。
- * 用来保证一致可靠的执行顺序。
- * 
- * 因此我们需要加入一些处理。把resolve里的代码放到异步队列中去。这里我们利用setTimeout来实现。
- * 原理就是通过setTimeout机制，将resolve中执行回调的逻辑放置到JS任务队列末尾，以保证在resolve执行时，
- * then方法的回调函数已经注册完成
- * 
+ * 状态机制
+ * 如果 Promise 异步操作已经成功，之后调用 then 注册的回调再也不会执行了
  */
-function Promise(fn){
+
+var p1 = new MyPromise(function(resolve){
+  resolve('响应的数据')
+})
+
+p1.then(function(response){
+  console.log(response);   // 此处能打印出来
+})
+
+setTimeout(()=>{
+  p1.then((response)=>{
+    console.log(response) // 此处没有被打印出来，为什么？
+  })
+},)
+
+
+// 由于promise异步操作已经完成，之后调用的then方法往deferreds里加入的回调函数都没有机会执行，
+// 为了解决这个问题，需要引入规范中所说的 states，即每个 Promise 存在三个互斥状态：pending（等待状态）、fulfilled（成功态）、rejected（失败态）
+// 基于此，我们重新设计MyPromise
+
+function MyPromise(fn){
   var value= null;
-  var callbacks = [];
+  var status = 'pending';  // 加入状态的字段
+  var deferreds = [];
   this.then = function(onFulfilled) {
-    callbacks.push({f:onFulfilled});
-    return this;
+    if(status === 'pending'){ // 加入状态的判断，如果状态是fullfilled态，则直接执行回调
+      deferreds.push(onFulfilled);
+    }else{
+      onFulfilled(value)
+    }
   }
 
-  function resolve(value){
+  function resolve(v){
     setTimeout(function(){
-        callbacks.map(function(cb,index){
-          if(index === 0){
-            callbacks[index].value = value;
-          }
-          var rsp = cb.f(cb.value);
-          if(typeof callbacks[index+1] !== 'undefined'){
-            callbacks[index+1].value = rsp;
-          }
-        })
+      value = v;
+      status = 'fulfilled'  // 执行resolve的时候，把状态变成fulfilled态
+      deferreds.forEach(function(deferred){
+        deferred(value);
+      })
     },0)
   }
+
   fn(resolve);
 }
 
 
-// 使用Promise,现在即使是同步的立马resolve，也能正常运行了。
-var p = new Promise(function(resolve){
-    resolve('这是响应的数据')
+// 我们使用我们改进后的promise，再次运行刚刚的这段代码。我们发现。之后调用 then 注册的回调再也执行了
+var p1 = new MyPromise(function(resolve){
+  resolve('响应的数据')
 })
 
-p.then(function(response){
-  console.log(response);
-  return 1;
-}).then(function(response){
-  console.log(response);
-  return 2;  
-}).then(function(response){
-  console.log(response);
+p1.then(function(response){
+  console.log(response);   // 此处能打印出来
 })
+
+setTimeout(()=>{
+  p1.then((response)=>{
+    console.log(response) // 此处这次被打印出来了
+  })
+},)

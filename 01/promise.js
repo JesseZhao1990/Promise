@@ -2,16 +2,16 @@
  * 定义Promise
  * 先实现一个最简单的。用setTimeout模拟一个异步的请求。
  */
-function Promise(fn){
+function MyPromise(fn){
   var value= null;
-  var callbacks = [];
+  var deferreds = [];
   this.then = function(onFulfilled) {
-    callbacks.push(onFulfilled);
+    deferreds.push(onFulfilled);
   }
 
   function resolve(value){
-    callbacks.forEach(function(cb){
-      cb(value);
+    deferreds.forEach(function(deferred){
+      deferred(value);
     })
   }
 
@@ -19,8 +19,8 @@ function Promise(fn){
 }
 
 
-// 使用Promise
-var p = new Promise(function(resolve){
+// 使用MyPromise
+var p = new MyPromise(function(resolve){
   setTimeout(function(){
     resolve('这是响应的数据')
   },2000)
